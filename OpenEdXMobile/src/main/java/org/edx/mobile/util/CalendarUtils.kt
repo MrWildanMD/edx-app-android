@@ -8,6 +8,8 @@ import android.database.Cursor
 import android.net.Uri
 import android.provider.CalendarContract
 import android.text.TextUtils
+import android.view.LayoutInflater
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import io.branch.indexing.BranchUniversalObject
@@ -417,5 +419,20 @@ object CalendarUtils {
         courseName: String
     ): String {
         return "${environment.config.platformName} - $courseName"
+    }
+
+    /**
+     * Custom Loading Dialog to show while creating/updating Calendar Events
+     * @param context - current [Context] of the application
+     * @param layoutInflater
+     */
+    @JvmStatic
+    fun getLoadingDialog(context: Context, layoutInflater: LayoutInflater): AlertDialog {
+        val builder: AlertDialog.Builder = AlertDialog.Builder(context)
+        builder.setTitle(context.getString(R.string.title_syncing_calendar))
+        val customView = layoutInflater.inflate(R.layout.alert_dialog_progress, null)
+        builder.setView(customView)
+        builder.setCancelable(false)
+        return builder.create()
     }
 }

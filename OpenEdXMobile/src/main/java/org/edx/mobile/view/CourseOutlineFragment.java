@@ -20,6 +20,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.view.ActionMode;
 import androidx.appcompat.widget.AppCompatImageView;
@@ -66,7 +67,6 @@ import org.edx.mobile.model.api.ProfileModel;
 import org.edx.mobile.model.course.BlockPath;
 import org.edx.mobile.model.course.CourseBannerInfoModel;
 import org.edx.mobile.model.course.CourseComponent;
-import org.edx.mobile.model.course.CourseDateBlock;
 import org.edx.mobile.model.course.CourseStructureV1Model;
 import org.edx.mobile.model.course.HasDownloadEntry;
 import org.edx.mobile.model.course.VideoBlockModel;
@@ -147,6 +147,7 @@ public class CourseOutlineFragment extends OfflineSupportBaseFragment
     private String calendarTitle = "";
     private String accountName = "";
     private String screenName;
+    private AlertDialog loaderDialog;
 
     public static Bundle makeArguments(@NonNull EnrolledCoursesResponse model,
                                        @Nullable String courseComponentId, boolean isVideosMode, @ScreenDef String screenName) {
@@ -196,6 +197,7 @@ public class CourseOutlineFragment extends OfflineSupportBaseFragment
         restore(bundle);
         calendarTitle = CalendarUtils.getCourseCalendarTitle(environment, courseData.getCourse().getName());
         accountName = CalendarUtils.getUserAccountForSync(environment);
+        loaderDialog = CalendarUtils.getLoadingDialog(getContextOrThrow(), getLayoutInflater());
         initListView(view);
         if (isOnCourseOutline) {
             initObserver();
@@ -216,6 +218,16 @@ public class CourseOutlineFragment extends OfflineSupportBaseFragment
 
     private void initObserver() {
         courseDateViewModel = new ViewModelProvider(this, new ViewModelFactory()).get(CourseDateViewModel.class);
+
+        courseDateViewModel.getSyncLoader().observe(getViewLifecycleOwner(), showLoader -> {
+            if (showLoader) {
+                loaderDialog.show();
+            } else {
+                loaderDialog.dismiss();
+                showCalendarUpdatedSnackbar();
+                trackCalendarEvent(Analytics.Events.CALENDAR_UPDATE_SUCCESS, Analytics.Values.CALENDAR_UPDATE_SUCCESS);
+            }
+        });
 
         courseDateViewModel.getCourseDates().observe(getViewLifecycleOwner(), courseDates -> {
             if (courseDates.getCourseDateBlocks() != null) {
@@ -277,15 +289,9 @@ public class CourseOutlineFragment extends OfflineSupportBaseFragment
     private void updateCalendarEvents() {
         trackCalendarEvent(Analytics.Events.CALENDAR_SYNC_UPDATE, Analytics.Values.CALENDAR_SYNC_UPDATE);
         long newCalId = CalendarUtils.createOrUpdateCalendar(getContextOrThrow(), accountName, CalendarContract.ACCOUNT_TYPE_LOCAL, calendarTitle);
-        if (courseDateViewModel.getCourseDates().getValue() != null) {
-            for (CourseDateBlock courseDateBlock : courseDateViewModel.getCourseDates().getValue().getCourseDateBlocks()) {
-                ConfigUtil.Companion.checkCalendarSyncEnabled(environment.getConfig(), response ->
-                        CalendarUtils.addEventsIntoCalendar(getContextOrThrow(), newCalId, courseData.getCourseId(),
-                                courseData.getCourse().getName(), courseDateBlock, response.isDeepLinkEnabled()));
-            }
-            showCalendarUpdatedSnackbar();
-            trackCalendarEvent(Analytics.Events.CALENDAR_UPDATE_SUCCESS, Analytics.Values.CALENDAR_UPDATE_SUCCESS);
-        }
+        ConfigUtil.Companion.checkCalendarSyncEnabled(environment.getConfig(), response ->
+                courseDateViewModel.addOrUpdateEventsInCalendar(getContextOrThrow(),
+                        newCalId, courseData.getCourseId(), courseData.getCourse().getName(), response.isDeepLinkEnabled(), true));
     }
 
     private void removeCalendar(Long calendarId) {

@@ -4,10 +4,9 @@ import android.app.Activity
 import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
+import android.view.*
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
@@ -32,6 +31,7 @@ import org.edx.mobile.view.adapters.CourseDatesAdapter
 import org.edx.mobile.view.dialog.AlertDialogFragment
 import org.edx.mobile.viewModel.CourseDateViewModel
 import org.edx.mobile.viewModel.ViewModelFactory
+import java.util.*
 
 class CourseDatesPageFragment : OfflineSupportBaseFragment(), BaseFragment.PermissionListener {
 
@@ -61,6 +61,7 @@ class CourseDatesPageFragment : OfflineSupportBaseFragment(), BaseFragment.Permi
     private lateinit var accountName: String
     private lateinit var keyValMap: Map<String, CharSequence>
     private var isCalendarExist: Boolean = false
+    private lateinit var loaderDialog: AlertDialog
 
 
     companion object {
@@ -108,6 +109,7 @@ class CourseDatesPageFragment : OfflineSupportBaseFragment(), BaseFragment.Permi
         )
 
         errorNotification = FullScreenErrorNotification(binding.swipeContainer)
+        loaderDialog = CalendarUtils.getLoadingDialog(contextOrThrow, layoutInflater)
 
         binding.swipeContainer.setOnRefreshListener {
             // Hide the progress bar as swipe layout has its own progress indicator
@@ -131,6 +133,15 @@ class CourseDatesPageFragment : OfflineSupportBaseFragment(), BaseFragment.Permi
 
         viewModel.bannerInfo.observe(viewLifecycleOwner, Observer {
             initDatesBanner(it)
+        })
+
+        viewModel.syncLoader.observe(viewLifecycleOwner, Observer { syncLoader ->
+            if (syncLoader) {
+                loaderDialog.show()
+            } else {
+                checkIfCalendarExists()
+                dismissLoader()
+            }
         })
 
         viewModel.courseDates.observe(viewLifecycleOwner, Observer { dates ->
@@ -204,7 +215,14 @@ class CourseDatesPageFragment : OfflineSupportBaseFragment(), BaseFragment.Permi
                         accountName = accountName,
                         calendarTitle = calendarTitle
                     )
-                    addOrUpdateEventsInCalendar(newCalId, true)
+                    viewModel.addOrUpdateEventsInCalendar(
+                        contextOrThrow,
+                        newCalId,
+                        courseData.courseId,
+                        courseData.course.name,
+                        isDeepLinkEnabled,
+                        true
+                    )
                 },
                 getString(R.string.label_remove_course_calendar),
                 { _: DialogInterface?, _: Int ->
@@ -328,28 +346,30 @@ class CourseDatesPageFragment : OfflineSupportBaseFragment(), BaseFragment.Permi
             binding.switchSync.isChecked = false
             return
         }
-        addOrUpdateEventsInCalendar(calendarId, false)
+        viewModel.addOrUpdateEventsInCalendar(
+            contextOrThrow,
+            calendarId,
+            courseData.courseId,
+            courseData.course.name,
+            isDeepLinkEnabled,
+            false
+        )
     }
 
-    private fun addOrUpdateEventsInCalendar(calendarId: Long, updateEvents: Boolean) {
-        val courseDates = viewModel.courseDates.value
-        courseDates?.courseDateBlocks?.forEach { courseDateBlock ->
-            CalendarUtils.addEventsIntoCalendar(
-                context = contextOrThrow,
-                calendarId = calendarId,
-                courseId = courseData.courseId,
-                courseName = courseData.course.name,
-                courseDateBlock = courseDateBlock,
-                isDeeplinkEnabled = isDeepLinkEnabled
-            )
-        }
-        checkIfCalendarExists()
-        if (updateEvents) {
+    private fun dismissLoader() {
+        loaderDialog.dismiss()
+        if (viewModel.areEventsUpdated) {
             showCalendarUpdatedSnackbar()
-            trackCalendarEvent(Analytics.Events.CALENDAR_UPDATE_SUCCESS, Analytics.Values.CALENDAR_UPDATE_SUCCESS)
+            trackCalendarEvent(
+                Analytics.Events.CALENDAR_UPDATE_SUCCESS,
+                Analytics.Values.CALENDAR_UPDATE_SUCCESS
+            )
         } else {
             calendarAddedSuccessDialog()
-            trackCalendarEvent(Analytics.Events.CALENDAR_ADD_SUCCESS, Analytics.Values.CALENDAR_ADD_SUCCESS)
+            trackCalendarEvent(
+                Analytics.Events.CALENDAR_ADD_SUCCESS,
+                Analytics.Values.CALENDAR_ADD_SUCCESS
+            )
         }
     }
 
