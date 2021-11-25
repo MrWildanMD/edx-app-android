@@ -442,6 +442,14 @@ class CourseDatesPageFragment : OfflineSupportBaseFragment(), BaseFragment.Permi
     }
 
     private fun trackCalendarEvent(eventName: String, biValue: String) {
-        environment.analyticsRegistry.trackCalendarEvent(eventName, biValue, courseData.courseId, courseData.mode, isSelfPaced)
+        environment.analyticsRegistry.trackCalendarEvent(
+            eventName,
+            biValue,
+            courseData.courseId,
+            courseData.mode,
+            isSelfPaced,
+            viewModel.eventCreateStartTime
+        )
+        viewModel.eventCreateStartTime = 0L
     }
 }

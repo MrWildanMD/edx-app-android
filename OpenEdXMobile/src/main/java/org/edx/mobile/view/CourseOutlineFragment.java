@@ -302,7 +302,9 @@ public class CourseOutlineFragment extends OfflineSupportBaseFragment
     }
 
     private void trackCalendarEvent(String eventName, String biValue) {
-        environment.getAnalyticsRegistry().trackCalendarEvent(eventName, biValue, courseData.getCourseId(), courseData.getMode(), courseData.getCourse().isSelfPaced());
+        environment.getAnalyticsRegistry().trackCalendarEvent(eventName, biValue, courseData.getCourseId(),
+                courseData.getMode(), courseData.getCourse().isSelfPaced(), courseDateViewModel.getEventCreateStartTime());
+        courseDateViewModel.setEventCreateStartTime(0L);
     }
 
     private void restore(@Nullable Bundle savedInstanceState) {

@@ -356,7 +356,9 @@ public class CourseUnitWebViewFragment extends CourseUnitFragment {
     }
 
     private void trackCalendarEvent(String eventName, String biValue) {
-        environment.getAnalyticsRegistry().trackCalendarEvent(eventName, biValue, unit.getCourseId(), enrollmentMode, isSelfPaced);
+        environment.getAnalyticsRegistry().trackCalendarEvent(eventName, biValue, unit.getCourseId(),
+                enrollmentMode, isSelfPaced, courseDateViewModel.getEventCreateStartTime());
+        courseDateViewModel.setEventCreateStartTime(0L);
     }
 
     private void loadUnit(Boolean forceRefresh) {
